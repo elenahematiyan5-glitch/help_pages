@@ -1,0 +1,253 @@
+from flask import Flask, render_template_string, request, redirect, url_for
+
+app = Flask(__name__)
+
+all_entries = []
+
+html = '''
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+    <meta charset="UTF-8" />
+    <title>ثبت‌نام باشگاه آناهاتا</title>
+    <style>
+        body {
+            background-color: #ffcccc;
+            font-family: Tahoma, sans-serif;
+            padding: 20px;
+        }
+        h2 {
+            color: #990000;
+        }
+        label {
+            display: inline-block;
+            width: 150px;
+            margin-bottom: 8px;
+            font-weight: bold;
+        }
+        input, select {
+            margin-bottom: 10px;
+            padding: 5px;
+            width: 250px;
+        }
+        table {
+            border-collapse: collapse;
+            width: 100%%;
+            margin-top: 30px;
+            background: white;
+        }
+        th, td {
+            border: 1px solid #990000;
+            padding: 8px;
+            text-align: center;
+        }
+        th {
+            background-color: #ff9999;
+        }
+        .btn-submit {
+            background-color: #990000;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            cursor: pointer;
+            font-size: 16px;
+            border-radius: 5px;
+            margin-top: 10px;
+        }
+        .btn-edit {
+            background-color: #005500;
+            color: white;
+            padding: 5px 10px;
+            text-decoration: none;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+        .btn-edit:hover {
+            background-color: #004400;
+        }
+    </style>
+</head>
+<body>
+    <h2>فرم ثبت‌نام باشگاه آناهاتا</h2>
+    <form method="POST" action="{% if edit_index is not none %}{{ url_for('register', edit_index=edit_index) }}{% else %}{{ url_for('register') }}{% endif %}">
+        <label>نام و نام خانوادگی:</label>
+        <input type="text" name="name" required value="{{ data.name }}"><br>
+
+        <label>کد ملی:</label>
+        <input type="text" name="national_id" required value="{{ data.national_id }}"><br>
+
+        <label>شماره تماس:</label>
+        <input type="text" name="phone" required value="{{ data.phone }}"><br>
+
+        <label>تاریخ تولد:</label>
+        <input type="text" name="birth_date" placeholder="مثلاً 1389/05/10" value="{{ data.birth_date }}"><br>
+
+        <label>رشته ورزشی:</label>
+        <input type="text" name="sport" value="{{ data.sport }}"><br>
+
+        <label>سابقه ورزشی:</label>
+        <input type="text" name="experience" value="{{ data.experience }}"><br>
+
+        <label>بیماری خاص:</label>
+        <input type="text" name="disease" value="{{ data.disease }}"><br>
+
+        <label>بیمه ورزشی:</label>
+        <select name="insurance">
+            <option value="دارد" {% if data.insurance == 'دارد' %}selected{% endif %}>دارد</option>
+            <option value="ندارد" {% if data.insurance == 'ندارد' %}selected{% endif %}>ندارد</option>
+        </select><br>
+
+        <label>تاریخ ثبت‌نام (شمسی):</label>
+        <input type="text" name="register_date" placeholder="مثلاً ۱۴۰۴/۰۵/۳۱" value="{{ data.register_date }}"><br>
+
+        <label>برنامه کلاس (دستی بنویسید):</label>
+        <input type="text" name="class_schedule" placeholder="مثلاً یکشنبه و سه‌شنبه ساعت ۶ تا ۷" value="{{ data.class_schedule }}"><br>
+
+        <label>تعداد جلسات ثبت‌نامی:</label>
+        <input type="number" name="sessions" min="1" max="30" value="{{ data.sessions }}"><br>
+
+        <h3>ثبت حضور و غیاب:</h3>
+        {% if data.sessions|int > 0 %}
+            {% for i in range(data.sessions|int) %}
+                جلسه {{ i+1 }}:
+                <input type="checkbox" name="attendance" value="{{ i }}"
+                    {% if i in data.attendance %}checked{% endif %}><br>
+            {% endfor %}
+        {% else %}
+            <p>برای ثبت حضور و غیاب ابتدا تعداد جلسات را وارد کنید و فرم را ارسال کنید.</p>
+        {% endif %}
+
+        <label>مبلغ شهریه:</label>
+        <input type="text" name="fee" value="{{ data.fee }}"><br><br>
+
+        <button type="submit" class="btn-submit">
+            {% if edit_index is not none %}ویرایش اطلاعات{% else %}ثبت نهایی{% endif %}
+        </button>
+    </form>
+
+    {% if entries %}
+    <h3>لیست ورزشکاران ثبت‌شده</h3>
+    <table>
+        <tr>
+            <th>نام</th><th>کد ملی</th><th>شماره تماس</th><th>تاریخ تولد</th><th>رشته</th>
+            <th>سابقه</th><th>بیماری</th><th>بیمه</th><th>تاریخ ثبت‌نام</th>
+            <th>برنامه کلاس</th><th>جلسات</th><th>تعداد حضور</th><th>شهریه</th><th>عملیات</th>
+        </tr>
+        {% for e in entries %}
+        <tr>
+            <td>{{ e.name }}</td>
+            <td>{{ e.national_id }}</td>
+            <td>{{ e.phone }}</td>
+            <td>{{ e.birth_date }}</td>
+            <td>{{ e.sport }}</td>
+            <td>{{ e.experience }}</td>
+            <td>{{ e.disease }}</td>
+            <td>{{ e.insurance }}</td>
+            <td>{{ e.register_date }}</td>
+            <td>{{ e.class_schedule }}</td>
+            <td>{{ e.sessions }}</td>
+            <td>{{ e.attendance|length }}</td>
+            <td>{{ e.fee }}</td>
+            <td>
+                <a href="{{ url_for('edit', index=loop.index0) }}" class="btn-edit">ویرایش</a>
+            </td>
+        </tr>
+        {% endfor %}
+    </table>
+    {% endif %}
+</body>
+</html>
+'''
+
+@app.route('/', methods=['GET', 'POST'])
+def register():
+    data = {
+        'name': '',
+        'national_id': '',
+        'phone': '',
+        'birth_date': '',
+        'sport': '',
+        'experience': '',
+        'disease': '',
+        'insurance': 'دارد',
+        'register_date': '',
+        'class_schedule': '',
+        'sessions': 0,
+        'attendance': [],
+        'fee': ''
+    }
+    edit_index = request.args.get('edit_index')
+    if edit_index is not None:
+        try:
+            edit_index = int(edit_index)
+        except:
+            edit_index = None
+    else:
+        edit_index = None
+
+    if request.method == 'POST':
+        sessions = request.form.get('sessions', '0')
+        try:
+            sessions_int = int(sessions)
+        except:
+            sessions_int = 0
+
+        attendance_list = request.form.getlist('attendance')
+        attendance_checked = []
+        for a in attendance_list:
+            try:
+                attendance_checked.append(int(a))
+            except:
+                pass
+
+        if edit_index is not None and 0 <= edit_index < len(all_entries):
+            all_entries[edit_index] = {
+                'name': request.form.get('name', ''),
+                'national_id': request.form.get('national_id', ''),
+                'phone': request.form.get('phone', ''),
+                'birth_date': request.form.get('birth_date', ''),
+                'sport': request.form.get('sport', ''),
+                'experience': request.form.get('experience', ''),
+                'disease': request.form.get('disease', ''),
+                'insurance': request.form.get('insurance', ''),
+                'register_date': request.form.get('register_date', ''),
+                'class_schedule': request.form.get('class_schedule', ''),
+                'sessions': sessions_int,
+                'attendance': attendance_checked,
+                'fee': request.form.get('fee', ''),
+            }
+        else:
+            all_entries.append({
+                'name': request.form.get('name', ''),
+                'national_id': request.form.get('national_id', ''),
+                'phone': request.form.get('phone', ''),
+                'birth_date': request.form.get('birth_date', ''),
+                'sport': request.form.get('sport', ''),
+                'experience': request.form.get('experience', ''),
+                'disease': request.form.get('disease', ''),
+                'insurance': request.form.get('insurance', ''),
+                'register_date': request.form.get('register_date', ''),
+                'class_schedule': request.form.get('class_schedule', ''),
+                'sessions': sessions_int,
+                'attendance': attendance_checked,
+                'fee': request.form.get('fee', ''),
+            })
+        return redirect(url_for('register'))
+
+    if edit_index is not None and 0 <= edit_index < len(all_entries):
+        data = all_entries[edit_index]
+    else:
+        data['sessions'] = 0
+        data['attendance'] = []
+
+    return render_template_string(html, entries=all_entries, data=data, edit_index=edit_index)
+
+@app.route('/edit/<int:index>', methods=['GET'])
+def edit(index):
+    if 0 <= index < len(all_entries):
+        return redirect(url_for('register', edit_index=index))
+    else:
+        return redirect(url_for('register'))
+
+if __name__ == '__main__':
+    app.run() 
